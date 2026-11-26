@@ -1,716 +1,425 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
 <title>Charity Ticker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&display=swap">
 <style>
-  @font-face {
-    font-family: 'FSSinclair';
-    src: url('https://cdn.jsdelivr.net/gh/adeafblindman/Heros2026@main/FSSinclair-Medium.otf') format('opentype');
-    font-weight: 500;
-    font-style: normal;
-    font-display: swap;
+  @font-face{font-family:'FSSinclair';src:url('FSSinclair-Medium.otf') format('opentype');font-display:swap}
+  :root{
+    --bg:#0b0d10; --accent:#ffe14a; --text:#f4f5f0;
+    --dim:#9aa3ad; --good:#6fe08a; --info:#63c7ff; --track:#303742;
+    --page:transparent; --font:'FSSinclair','Barlow Condensed','Arial Narrow',sans-serif;
   }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--page)}
+  body{display:flex;flex-direction:column;justify-content:flex-end}
+  body.top{justify-content:flex-start} body.center{justify-content:center}
+  body{font-family:var(--font);color:var(--text);
+       text-transform:uppercase;font-variant-numeric:tabular-nums;white-space:nowrap}
+  #bar{display:flex;flex:none;width:1920px;height:56px;background:var(--bg);position:relative}
+  #bar::before,#bar::after{content:"";position:absolute;left:0;right:0;height:2px;background:var(--accent);z-index:3}
+  #bar::before{top:0} #bar::after{bottom:0}
 
-  :root {
-    --bg-color: transparent;
-    --bar-color: #2ecc71;
-    --bar-track-color: rgba(255,255,255,0.15);
-    --text-color: #ffffff;
-    --accent-color: #ffcc00;
-    --sub-text-color: rgba(255,255,255,0.75);
-    --font-family: 'FSSinclair', 'Segoe UI', Arial, sans-serif;
-  }
+  #total{display:flex;align-items:center;gap:12px;padding:0 44px 0 20px;background:var(--accent);color:#0b0d10;
+         clip-path:polygon(0 0,100% 0,calc(100% - 24px) 100%,0 100%);z-index:2;flex:none}
+  #total .label{font-size:18px;font-weight:700;letter-spacing:2px}
+  #raised{font-size:38px;font-weight:800;line-height:1}
+  #goal{font-size:20px;font-weight:600;opacity:.75}
 
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: var(--bg-color);
-    font-family: var(--font-family);
-    color: var(--text-color);
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-  }
+  .stripes{width:34px;flex:none;margin-left:-14px;
+    background:repeating-linear-gradient(115deg,var(--accent) 0 6px,transparent 6px 12px);
+    clip-path:polygon(40% 0,100% 0,60% 100%,0 100%)}
 
-  #ticker-root {
-    box-sizing: border-box;
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    align-items: flex-end; /* default: bar sits at the bottom */
-    justify-content: center;
-    padding: 12px 20px;
-  }
+  #feed{flex:1;overflow:hidden;position:relative;min-width:0;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 36px,#000 calc(100% - 36px),transparent);
+            mask-image:linear-gradient(90deg,transparent,#000 36px,#000 calc(100% - 36px),transparent)}
+  #track{display:flex;height:100%;width:max-content;will-change:transform}
+  .group{display:flex;height:100%}
+  .item{display:flex;align-items:center;gap:10px;padding:0 22px;font-size:24px;font-weight:600;letter-spacing:.5px}
+  .item::after{content:"";width:8px;height:8px;background:var(--accent);transform:rotate(45deg);margin-left:34px}
+  .tag{font-size:15px;font-weight:800;letter-spacing:2px;padding:2px 8px 1px;border:2px solid currentColor;color:var(--accent)}
+  .tag.good{color:var(--good)} .tag.info{color:var(--info)}
+  .val{color:var(--accent);font-weight:800}
+  .sub{color:var(--dim);font-size:20px}
 
-  #ticker-root.pos-top {
-    align-items: flex-start;
-  }
-
-  #ticker-root.pos-center {
-    align-items: center;
-  }
-
-  #ticker-root.pos-bottom {
-    align-items: flex-end;
-  }
-
-  .panel {
-    width: 100%;
-    height: auto;
-    flex-shrink: 0;
-    display: none;
-    flex-direction: column;
-    justify-content: center;
-    gap: 6px;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-  }
-
-  .panel.active {
-    display: flex;
-    opacity: 1;
-  }
-
-  .panel-title {
-    font-size: clamp(14px, 2.4vh, 22px);
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    color: var(--accent-color);
-    margin: 0 0 2px 0;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.6);
-  }
-
-  /* ---------- Bar 1: Total Raised ---------- */
-  .total-amount {
-    font-size: clamp(28px, 6vh, 56px);
-    font-weight: 800;
-    line-height: 1;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
-  }
-
-  .total-amount .label {
-    font-size: clamp(13px, 2vh, 20px);
-    font-weight: 500;
-    color: var(--sub-text-color);
-    margin-left: 8px;
-  }
-
-  .progress-track {
-    width: 100%;
-    height: clamp(14px, 3vh, 28px);
-    background: var(--bar-track-color);
-    border-radius: 999px;
-    overflow: hidden;
-    position: relative;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
-  }
-
-  .progress-fill {
-    height: 100%;
-    background: var(--bar-color);
-    border-radius: 999px;
-    transition: width 1s ease-out;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    box-shadow: 0 0 8px var(--bar-color);
-  }
-
-  .progress-pct {
-    font-size: clamp(11px, 1.8vh, 16px);
-    font-weight: 700;
-    color: #fff;
-    padding-right: 8px;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
-    white-space: nowrap;
-  }
-
-  /* ---------- Single-entry display (fundraisers / campaigns / donors) ---------- */
-  .single-entry-wrap {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: clamp(6px, 1.4vh, 14px);
-  }
-
-  .single-entry {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    width: 100%;
-    opacity: 1;
-    transition: opacity 0.35s ease;
-  }
-
-  .single-entry.swapping {
-    opacity: 0;
-  }
-
-  .single-entry .rank {
-    font-weight: 800;
-    color: var(--accent-color);
-    font-size: clamp(16px, 3vh, 26px);
-    min-width: 1.4em;
-    text-align: right;
-    flex-shrink: 0;
-  }
-
-  .single-entry .avatar {
-    width: clamp(32px, 6vh, 56px);
-    height: clamp(32px, 6vh, 56px);
-    border-radius: 50%;
-    object-fit: cover;
-    border: 2px solid var(--accent-color);
-    flex-shrink: 0;
-    background: rgba(255,255,255,0.1);
-  }
-
-  .single-entry .name-block {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    overflow: hidden;
-  }
-
-  .single-entry .primary-name {
-    font-size: clamp(16px, 3vh, 28px);
-    font-weight: 700;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-  }
-
-  .single-entry .secondary-name {
-    font-size: clamp(12px, 2vh, 17px);
-    color: var(--sub-text-color);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .single-entry .amount {
-    font-size: clamp(18px, 3.4vh, 30px);
-    font-weight: 800;
-    color: var(--bar-color);
-    white-space: nowrap;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-    flex-shrink: 0;
-    margin-left: auto;
-  }
-
-  .entry-dots {
-    display: flex;
-    gap: 6px;
-    margin-top: 2px;
-  }
-
-  .entry-dots .dot {
-    width: clamp(5px, 0.9vh, 8px);
-    height: clamp(5px, 0.9vh, 8px);
-    border-radius: 50%;
-    background: var(--bar-track-color);
-    transition: background 0.3s ease;
-  }
-
-  .entry-dots .dot.active {
-    background: var(--accent-color);
-  }
-
-  /* ---------- Status / error state ---------- */
-  #status-msg {
-    font-size: clamp(12px, 1.8vh, 16px);
-    color: var(--sub-text-color);
-    text-align: center;
-  }
-
-  #status-msg.error {
-    color: #ff6b6b;
-  }
+  #badge:not(:empty){padding:1px 6px;background:var(--bg)}
+  #badge{position:absolute;right:4px;top:4px;font-size:11px;font-weight:700;letter-spacing:1px;color:#ff8a6a;z-index:4}
 </style>
 </head>
 <body>
-
-<div id="ticker-root">
-  <div id="status-msg">Loading…</div>
-
-  <!-- Panel 1: Total Raised -->
-  <div class="panel" id="panel-total">
-    <div class="panel-title" id="title-total">Total Raised</div>
-    <div class="total-amount">
-      <span id="total-amount-value">$0.00</span>
-      <span class="label" id="total-amount-label">raised so far</span>
-    </div>
-    <div class="progress-track">
-      <div class="progress-fill" id="progress-fill" style="width:0%">
-        <span class="progress-pct" id="progress-pct-text">0%</span>
-      </div>
-    </div>
+<div id="bar">
+  <div id="total">
+    <div class="label" id="label">Total raised</div>
+    <div id="raised">--</div>
+    <div id="goal"></div>
   </div>
-
-  <!-- Panel 2: Top Fundraisers -->
-  <div class="panel" id="panel-fundraisers">
-    <div class="panel-title" id="title-fundraisers">Top Fundraisers</div>
-    <div class="single-entry-wrap" id="entry-fundraisers"></div>
-  </div>
-
-  <!-- Panel 3: Supporting Campaigns -->
-  <div class="panel" id="panel-campaigns">
-    <div class="panel-title" id="title-campaigns">Supporting Campaigns</div>
-    <div class="single-entry-wrap" id="entry-campaigns"></div>
-  </div>
-
-  <!-- Panel 4: Top Donors -->
-  <div class="panel" id="panel-donors">
-    <div class="panel-title" id="title-donors">Top Donors</div>
-    <div class="single-entry-wrap" id="entry-donors"></div>
-  </div>
-
-  <!-- Panel 5: Top Teams -->
-  <div class="panel" id="panel-teams">
-    <div class="panel-title" id="title-teams">Top Teams</div>
-    <div class="single-entry-wrap" id="entry-teams"></div>
-  </div>
+  <div class="stripes"></div>
+  <div id="feed"><div id="track"></div></div>
+  <div id="badge"></div>
 </div>
 
 <script>
-(function () {
-  "use strict";
+'use strict';
+// Optional: paste your Cloudflare Worker address here so you can leave ?proxy= off the URL
+const DEFAULT_PROXY = '';
+const DEFAULT_API = 'https://hd2clans.com/api/public/heroes26';
 
-  // ----------------------------------------------------------------------
-  // CONFIG: read from URL parameters
-  // ----------------------------------------------------------------------
-  // Example:
-  //   ?bg=transparent&bar=00ff88&text=ffffff&accent=ffcc00&track=ffffff33
-  //   &w=800&h=200&rotate=8&entry=5&refresh=30&maxitems=5&position=bottom
-  //   &title_total=Total%20Raised&title_fundraisers=Top%20Fundraisers
-  //   &title_campaigns=Campaigns&title_donors=Top%20Donors&title_teams=Top%20Teams
-  //   &label_total=raised%20so%20far
-  //   &api=https://hd2clans.com/api/public/heroes26
-  //   &panels=total,fundraisers,campaigns,donors,teams
-  //   &fundraisers=https://tiltify.com/@tana-sukke/helldivers-2-heroes-26-fundraiser-for-save-the-children
-  //   &team=/+2nd-liberation-battalion/profile
+// A literal "+" in a team address stays a "+" (use %20 for spaces)
+const params = new URLSearchParams(location.search.replace(/\+/g, '%2B'));
+const text = name => (params.get(name) || '').trim();
+const num = (name, fallback, min, max) => {
+  const v = parseFloat(params.get(name));
+  return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
+};
 
-  const params = new URLSearchParams(window.location.search);
+const DEMO = params.has('demo');
+const CAMPAIGN = text('campaign') || text('fundraisers');
+const TEAM = text('team');
+const PROXY = (text('proxy') || DEFAULT_PROXY).replace(/\/+$/, '');
+const API = text('api') || DEFAULT_API;
+const DIRECT = Boolean(PROXY && (CAMPAIGN || TEAM || text('proxy')));
+const SPEED = num('speed', 90, 20, 400); // pixels per second
+const REFRESH = num('refresh', DIRECT ? 15 : 30, DIRECT ? 10 : 5, 3600);
+const MAXITEMS = Math.floor(num('maxitems', 5, 1, 50));
+const PANELS = (text('panels') || 'campaign,next,donations,milestones,targets,polls,fundraisers,campaigns,donors,teams')
+  .split(',').map(x => x.trim().toLowerCase());
+const $ = id => document.getElementById(id);
 
-  function getColor(name, fallback) {
-    let v = params.get(name);
-    if (!v) return fallback;
-    v = v.trim();
-    // Allow passing hex without '#' since '#' needs URL-encoding otherwise
-    if (/^[0-9a-fA-F]{3,8}$/.test(v)) v = '#' + v;
-    return v;
+for (const [param, prop] of [['bg', '--page'], ['bar', '--bg'], ['accent', '--accent'],
+                             ['text', '--text'], ['subtext', '--dim'], ['track', '--track'], ['font', '--font']]) {
+  let v = text(param);
+  if (!v) continue;
+  if (param !== 'font' && /^([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v)) v = '#' + v;
+  document.documentElement.style.setProperty(prop, v);
+}
+if (['top', 'center'].includes(text('position'))) document.body.className = text('position');
+
+// ?milestones=2500:Costume stream|5000:Hot sauce
+const URL_MILESTONES = text('milestones').split('|').map(entry => {
+  const [amount, ...name] = entry.split(':');
+  return { amount: Number(amount.replace(/[$,\s]/g, '')), name: name.join(':').trim() || 'Milestone' };
+}).filter(m => m.amount > 0).sort((a, b) => a.amount - b.amount);
+
+// Sample numbers for layout preview only; the DEMO badge stays on screen
+const sample = {
+  status: 'ok',
+  data: {
+    name: 'Sample Charity Campaign', currency: 'USD', raised: 3275, goal: 10000,
+    milestones: [
+      { name: 'Sample milestone: costume stream', amount: 2500 },
+      { name: 'Sample milestone: hot sauce challenge', amount: 5000 },
+      { name: 'Sample milestone: 24 hour stream', amount: 7500 },
+    ],
+    donations: [{ name: 'Sample Donor A', amount: 50 }, { name: 'Sample Donor B', amount: 25 }],
+    targets: [{ name: 'Sample target: new loadout', amount: 500, raised: 180 }],
+    polls: [{ name: 'Sample poll: next mission', options: [{ name: 'Bugs', raised: 120 }, { name: 'Bots', raised: 95 }] }],
+  },
+};
+
+let fmt, fmtCurrency;
+function money(n, currency) {
+  if (currency !== fmtCurrency) {
+    fmtCurrency = currency;
+    fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency });
   }
+  return fmt.format(n || 0).replace(/\.00$/, '');
+}
 
-  function getText(name, fallback) {
-    const v = params.get(name);
-    return (v === null || v === '') ? fallback : v;
-  }
+function el(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text != null) node.textContent = text; // API text is never treated as HTML
+  return node;
+}
+// parts: [text, class] pairs
+function item(tag, tone, parts) {
+  const node = el('div', 'item');
+  node.append(el('span', 'tag ' + tone, tag), ...parts.map(([t, c]) => el('span', c, t)));
+  return node;
+}
 
-  function getNum(name, fallback) {
-    const v = parseFloat(params.get(name));
-    return isNaN(v) ? fallback : v;
-  }
-
-  const CONFIG = {
-    bg: getColor('bg', 'transparent'),
-    barColor: getColor('bar', '#2ecc71'),
-    trackColor: getColor('track', 'rgba(255,255,255,0.15)'),
-    textColor: getColor('text', '#ffffff'),
-    accentColor: getColor('accent', '#ffcc00'),
-    subTextColor: getColor('subtext', 'rgba(255,255,255,0.75)'),
-    fontFamily: getText('font', "'FSSinclair', 'Segoe UI', Arial, sans-serif"),
-
-    width: params.get('w'),   // px, optional — forces fixed widget size
-    height: params.get('h'),  // px, optional
-
-    rotateSeconds: getNum('rotate', 8),     // dwell time for non-list panels (e.g. total raised)
-    entrySeconds: getNum('entry', 5),       // dwell time per entry within list panels
-    refreshSeconds: getNum('refresh', 30),  // how often to refetch the API
-    maxItems: Math.max(1, Math.floor(getNum('maxitems', 5))),
-
-    apiUrl: getText('api', 'https://hd2clans.com/api/public/heroes26'),
-
-    // Filter supporting_campaigns down to just one, by campaign_url
-    // (or campaign_slug, as a more forgiving fallback). e.g.
-    // ?fundraisers=https://tiltify.com/@tana-sukke/helldivers-2-heroes-26-fundraiser-for-save-the-children
-    fundraiserFilter: getText('fundraisers', null),
-
-    // Filter team_leaderboard down to just one, by team url. e.g.
-    // ?team=/%2B2nd-liberation-battalion/profile
-    // NOTE: if the team's url/slug contains a "+", it MUST be percent-encoded
-    // as %2B in the query string, otherwise browsers turn "+" into a space.
-    teamFilter: getText('team', null),
-
-    // Where the bar sits vertically in the page: 'top', 'center', or 'bottom'
-    position: (() => {
-      const v = (getText('position', 'bottom') || 'bottom').toLowerCase();
-      return ['top', 'center', 'bottom'].includes(v) ? v : 'bottom';
-    })(),
-
-    titles: {
-      total: getText('title_total', 'Total Raised'),
-      fundraisers: getText('title_fundraisers', 'Top Fundraisers'),
-      campaigns: getText('title_campaigns', 'Supporting Campaigns'),
-      donors: getText('title_donors', 'Top Donors'),
-      teams: getText('title_teams', 'Top Teams')
-    },
-    totalLabel: getText('label_total', 'raised so far'),
-
-    // Which panels to include & their order, e.g. ?panels=total,donors
-    panelOrder: getText('panels', 'total,fundraisers,campaigns,donors')
-      .split(',').map(s => s.trim()).filter(Boolean)
+function buildItems(s) {
+  const d = s.data;
+  if (!d) return [item('Status', 'info', [[s.message || 'Waiting for data']])];
+  const $$ = n => money(n, d.currency);
+  const sections = {
+    next: () => progress(d, $$),
+    campaign: () => d.name ? [item(d.kind || 'Campaign', '', [[d.name, 'name']])] : [],
+    donations: () => (d.donations || []).slice(0, MAXITEMS)
+      .map(x => item('Donation', 'good', [[x.name, 'name'], [$$(x.amount), 'val']])),
+    milestones: () => (d.milestones || []).map(m => {
+      const done = d.raised >= m.amount;
+      return item(done ? 'Unlocked' : 'Milestone', done ? 'good' : '', [[$$(m.amount), 'val'], [m.name, 'name']]);
+    }),
+    targets: () => (d.targets || []).map(t =>
+      item('Target', 'info', [[t.name, 'name'], [`${$$(t.raised)} / ${$$(t.amount)}`, 'val']])),
+    polls: () => (d.polls || []).map(p => {
+      const parts = [[p.name, 'name']];
+      for (const o of p.options) parts.push([o.name, 'sub'], [$$(o.raised), 'val']);
+      return item('Poll', 'info', parts);
+    }),
+    fundraisers: () => ranked('Top fundraiser', d.fundraisers, $$),
+    campaigns: () => ranked('Campaign', d.campaigns, $$),
+    donors: () => ranked('Top donor', d.donors, $$),
+    teams: () => ranked('Team', d.teams, $$),
   };
+  const out = PANELS.flatMap(key => Object.hasOwn(sections, key) ? sections[key]() : []);
+  return out.length ? out : [item('Status', 'info', [['Nothing to show yet']])];
+}
 
-  // ----------------------------------------------------------------------
-  // APPLY CONFIG: colors, fonts, size
-  // ----------------------------------------------------------------------
-  const root = document.documentElement;
-  root.style.setProperty('--bg-color', CONFIG.bg);
-  root.style.setProperty('--bar-color', CONFIG.barColor);
-  root.style.setProperty('--bar-track-color', CONFIG.trackColor);
-  root.style.setProperty('--text-color', CONFIG.textColor);
-  root.style.setProperty('--accent-color', CONFIG.accentColor);
-  root.style.setProperty('--sub-text-color', CONFIG.subTextColor);
-  root.style.setProperty('--font-family', CONFIG.fontFamily);
+// Next milestone, goal progress and event total, each as one line
+function progress(d, $$) {
+  const out = [];
+  const pct = n => [`${n.toFixed(1)}%`, 'val'];
+  const next = (d.milestones || []).find(m => m.amount > d.raised);
+  if (next) out.push(item('Next milestone', '', [[next.name, 'name'], [$$(next.amount), 'val'],
+    [`${$$(next.amount - d.raised)} to go`, 'sub']]));
+  if (d.goal) out.push(d.raised >= d.goal
+    ? item('Goal reached', 'good', [[$$(d.goal), 'val'], ['Thank you!']])
+    : item('Goal', '', [pct(d.raised / d.goal * 100), [`${$$(d.goal - d.raised)} to go`, 'sub']]));
+  if (d.event) out.push(item('Event total', 'info', [[$$(d.event.total), 'val'],
+    ...(d.event.pct == null ? [] : [pct(d.event.pct), ['of goal', 'sub']])]));
+  return out;
+}
 
-  document.getElementById('ticker-root').classList.add('pos-' + CONFIG.position);
-
-  if (CONFIG.width) {
-    document.body.style.width = CONFIG.width + 'px';
-    document.getElementById('ticker-root').style.width = CONFIG.width + 'px';
-  }
-  if (CONFIG.height) {
-    document.body.style.height = CONFIG.height + 'px';
-    document.getElementById('ticker-root').style.height = CONFIG.height + 'px';
-  }
-
-  document.getElementById('title-total').textContent = CONFIG.titles.total;
-  document.getElementById('title-fundraisers').textContent = CONFIG.titles.fundraisers;
-  document.getElementById('title-campaigns').textContent = CONFIG.titles.campaigns;
-  document.getElementById('title-donors').textContent = CONFIG.titles.donors;
-  document.getElementById('title-teams').textContent = CONFIG.titles.teams;
-  document.getElementById('total-amount-label').textContent = CONFIG.totalLabel;
-
-  // ----------------------------------------------------------------------
-  // HELPERS
-  // ----------------------------------------------------------------------
-  function formatCurrency(value) {
-    const num = parseFloat(value);
-    if (isNaN(num)) return '$0';
-    return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str == null ? '' : String(str);
-    return div.innerHTML;
-  }
-
-  // Normalizes a URL/slug for loose comparison: lowercases, strips protocol,
-  // strips trailing slash, strips query/hash.
-  function normalizeUrlForMatch(str) {
-    if (!str) return '';
-    return String(str)
-      .trim()
-      .toLowerCase()
-      .replace(/^https?:\/\//, '')
-      .replace(/[?#].*$/, '')
-      .replace(/\/+$/, '')
-      .replace(/^\/+/, '');
-  }
-
-  const FALLBACK_AVATAR = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
-    '<rect width="100" height="100" fill="#888"/>' +
-    '<circle cx="50" cy="38" r="20" fill="#ccc"/>' +
-    '<rect x="20" y="62" width="60" height="30" rx="15" fill="#ccc"/>' +
-    '</svg>'
-  );
-
-  function renderSingleEntry(container, items, idx, opts) {
-    if (!items.length) {
-      container.innerHTML = '';
-      return;
+function ranked(tag, rows, $$) {
+  return (rows || []).slice(0, MAXITEMS).map(r => {
+    const node = item(r.rank ? `${tag} #${r.rank}` : tag, '', [
+      [r.name, 'name'], ...(r.by ? [[`by ${r.by}`, 'sub']] : []), [$$(r.amount), 'val'],
+    ]);
+    if (/^https?:\/\//i.test(r.avatar || '')) {
+      const img = el('img', 'avatar');
+      img.alt = '';
+      img.onerror = () => { img.style.visibility = 'hidden'; };
+      img.src = r.avatar;
+      node.firstChild.after(img);
     }
-    const item = items[idx % items.length];
+    return node;
+  });
+}
 
-    let avatarHtml = '';
-    if (opts.showAvatar) {
-      avatarHtml = `<img class="avatar" src="${escapeHtml(item.avatarSrc || FALLBACK_AVATAR)}" alt=""
-        onerror="this.onerror=null;this.src='${FALLBACK_AVATAR}'">`;
-    }
+let shownRaised = null;
+function countTo(target, currency) {
+  const from = shownRaised ?? target;
+  shownRaised = target;
+  const start = performance.now();
+  (function step(now) {
+    if (shownRaised !== target) return;
+    const k = Math.min(1, Math.max(0, (now - start) / 1500));
+    $('raised').textContent = money(from + (target - from) * (1 - Math.pow(1 - k, 3)), currency);
+    if (k < 1) requestAnimationFrame(step);
+  })(start);
+}
 
-    const dotsHtml = items.length > 1
-      ? `<div class="entry-dots">${items.slice(0, CONFIG.maxItems).map((_, i) =>
-          `<span class="dot${i === idx ? ' active' : ''}"></span>`).join('')}</div>`
-      : '';
+function renderFixed(s) {
+  $('badge').textContent = DEMO ? 'DEMO DATA' : s.status === 'stale' ? 'RECONNECTING' : '';
+  const d = s.data;
+  if (!d) return;
+  $('label').textContent = d.label || 'Total raised';
+  countTo(d.raised, d.currency);
+  $('goal').textContent = d.goal ? `/ ${money(d.goal, d.currency)}` : '';
+}
 
-    container.innerHTML = `
-      <div class="single-entry" id="${container.id}-entry">
-        <span class="rank">${idx + 1}.</span>
-        ${avatarHtml}
-        <span class="name-block">
-          <span class="primary-name">${escapeHtml(item.primary)}</span>
-          ${item.secondary ? `<span class="secondary-name">${escapeHtml(item.secondary)}</span>` : ''}
-        </span>
-        <span class="amount">${formatCurrency(item.amount)}</span>
-      </div>
-      ${dotsHtml}
-    `;
+// Seamless scroll: two identical groups; new data swaps in when a loop finishes
+let pending = null, loopWidth = 0, offset = 0, last = null, hasData = false;
+function mount(s) {
+  const track = $('track');
+  const group = el('div', 'group');
+  track.replaceChildren(group);
+  const width = $('feed').clientWidth;
+  do { group.append(...buildItems(s)); } while (group.offsetWidth < width);
+  loopWidth = group.getBoundingClientRect().width;
+  track.append(group.cloneNode(true));
+}
+function frame(now) {
+  if (last !== null) offset += SPEED * Math.min(now - last, 100) / 1000;
+  last = now;
+  if (loopWidth && offset >= loopWidth) {
+    offset -= loopWidth;
+    if (pending) { mount(pending); pending = null; }
+  }
+  $('track').style.transform = `translate3d(${-offset}px,0,0)`;
+  requestAnimationFrame(frame);
+}
+
+function apply(s) {
+  renderFixed(s);
+  if (!loopWidth || (!hasData && s.data)) { mount(s); offset = 0; pending = null; }
+  else pending = s;
+  hasData = hasData || !!s.data;
+}
+
+// ---------- Data ----------
+const value = v => Number(v && typeof v === 'object' ? v.value : v) || 0;
+
+async function getJson(url) {
+  const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(12000) });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Data source returned ${res.status}`);
+  }
+  return res.json();
+}
+
+// Reduces a Tiltify address to "@user/campaign" or "+team/..." for comparing
+const path = v => String(v || '').trim().toLowerCase().replace(/[?#].*$/, '')
+  .replace(/^(https?:\/\/)?(www\.)?tiltify\.com/, '').replace(/^\/+|\/+$/g, '').replace(/\/profile$/, '');
+
+function findCampaign(rows, wanted) {
+  const w = path(wanted);
+  const exact = rows.filter(c => path(c.campaign_url) === w);
+  if (exact.length) return exact[0];
+  // A user name or campaign slug alone only counts if exactly one campaign has it
+  for (const test of [c => path(c.campaign_url).split('/')[0].replace(/^@/, '') === w.replace(/^@/, ''),
+                      c => String(c.campaign_slug || '').toLowerCase() === w]) {
+    const hits = rows.filter(test);
+    if (hits.length === 1) return hits[0];
+  }
+  return null;
+}
+
+function findTeam(rows, wanted) {
+  const w = path(wanted);
+  const bare = x => x.replace(/^\+/, '');
+  return rows.find(t => bare(path(t.url)) === bare(w)) ||
+         rows.find(t => String(t.name || '').toLowerCase() === wanted.toLowerCase()) || null;
+}
+
+// The event feed (hd2clans), which needs no keys
+async function loadEvent() {
+  const raw = await getJson(API);
+  const d = (raw && raw.tiltify) || raw;
+  if (!d || d.total_raised == null) throw new Error('The event feed has no total_raised field');
+  const person = (x, i) => ({ rank: i + 1, name: x.name, amount: value(x.amount), avatar: x.avatar && x.avatar.src });
+  const campaignRow = (c, i) => ({ rank: i + 1, name: c.campaign_name || c.v || 'Campaign', by: c.user_name,
+    amount: value(c.amount_raised), avatar: c.user_avatar_url });
+
+  const allCampaigns = d.supporting_campaigns || [], allTeams = d.team_leaderboard || [];
+  let campaigns = allCampaigns.map(campaignRow), teams = allTeams.map(person);
+  const event = { total: value(d.total_raised), pct: d.pct == null ? null : value(d.pct) };
+  let picked = null;
+
+  if (TEAM) {
+    const t = findTeam(allTeams, TEAM);
+    if (!t) throw new Error(`Team "${TEAM}" is not in the event feed`);
+    const row = teams[allTeams.indexOf(t)];
+    teams = [row];
+    picked = { label: 'Team raised', kind: 'Team', name: row.name, raised: row.amount };
+  }
+  if (CAMPAIGN) {
+    const c = findCampaign(allCampaigns, CAMPAIGN);
+    if (!c) throw new Error(`Campaign "${CAMPAIGN}" was not found (use its full Tiltify address)`);
+    const row = campaigns[allCampaigns.indexOf(c)];
+    campaigns = [{ ...row, rank: null }];
+    picked = { label: 'Campaign raised', kind: 'Campaign', name: row.name, raised: row.amount, goal: value(c.goal) };
   }
 
-  // ----------------------------------------------------------------------
-  // RENDER FUNCTIONS PER PANEL
-  // ----------------------------------------------------------------------
-  // Holds the latest items array for each list-type panel, plus which
-  // entry index is currently displayed.
-  const PANEL_DATA = {
-    fundraisers: { items: [], showAvatar: true, containerId: 'entry-fundraisers' },
-    campaigns: { items: [], showAvatar: true, containerId: 'entry-campaigns' },
-    donors: { items: [], showAvatar: true, containerId: 'entry-donors' },
-    teams: { items: [], showAvatar: true, containerId: 'entry-teams' }
+  return {
+    currency: 'USD',
+    ...(picked || { label: 'Event raised', kind: 'Event', name: text('name') || 'Heroes 26', raised: event.total, goal: value(d.goal) }),
+    event: picked || !value(d.goal) ? event : null,
+    // URL milestones win; otherwise use the feed's, but only for the event total
+    milestones: URL_MILESTONES.length ? URL_MILESTONES : picked ? [] : (d.milestones || [])
+      .map(m => ({ name: m.name, amount: value(m.amount) })).sort((a, b) => a.amount - b.amount),
+    fundraisers: (d.fundraisers || []).map(person),
+    donors: (d.top_donors || []).map(person),
+    campaigns, teams,
   };
+}
 
-  function renderTotal(data) {
-    const raised = data.total_raised != null ? data.total_raised : 0;
-    const pct = data.pct != null ? data.pct : 0;
-    document.getElementById('total-amount-value').textContent = formatCurrency(raised);
-    const fill = document.getElementById('progress-fill');
-    const pctClamped = Math.max(0, Math.min(100, pct));
-    fill.style.width = pctClamped + '%';
-    document.getElementById('progress-pct-text').textContent = pct.toFixed
-      ? pct.toFixed(1) + '%'
-      : pct + '%';
+// Straight from Tiltify, through your proxy
+let base = null, previous = {};
+async function resolveBase() {
+  if (base) return base;
+  const input = CAMPAIGN || TEAM;
+  if (!input) throw new Error('Add ?campaign= or ?team= to the address');
+  const clean = input.replace(/[?#].*$/, '').replace(/\/+$/, '');
+  const slug = clean.match(/(?:^|\/)([@+])([^/]+)\/([^/]+)$/);
+  if (slug && slug[3] !== 'profile') {
+    const type = slug[1] === '+' ? 'team_campaigns' : 'campaigns';
+    const body = await getJson(`${PROXY}/api/public/${type}/by/slugs/${encodeURIComponent(slug[2])}/${encodeURIComponent(slug[3])}`);
+    base = `/api/public/${type}/${body.data.id}`;
+  } else if (/^[\w-]+$/.test(clean)) {
+    base = `/api/public/${CAMPAIGN ? 'campaigns' : 'team_campaigns'}/${clean}`;
+  } else {
+    throw new Error('Use a campaign address such as @user/campaign or +team/campaign');
   }
+  return base;
+}
 
-  function renderFundraisers(data) {
-    PANEL_DATA.fundraisers.items = (data.fundraisers || []).map(f => ({
-      primary: f.name,
-      secondary: '',
-      amount: f.amount ? f.amount.value : 0,
-      avatarSrc: f.avatar ? f.avatar.src : null
-    })).slice(0, CONFIG.maxItems);
+async function getAll(route) {
+  const rows = [];
+  let after = '';
+  for (let page = 0; page < 5; page++) {
+    const body = await getJson(`${PROXY}${route}?limit=100${after}`);
+    rows.push(...(body.data || []));
+    const cursor = body.metadata && body.metadata.after;
+    if (!cursor || !(body.data || []).length) break;
+    after = `&after=${encodeURIComponent(cursor)}`;
   }
+  return rows;
+}
 
-  function renderCampaigns(data) {
-    let campaigns = data.supporting_campaigns || [];
+const open = x => x.active !== false && (!x.ends_at || Date.parse(x.ends_at) > Date.now());
 
-    if (CONFIG.fundraiserFilter) {
-      const target = normalizeUrlForMatch(CONFIG.fundraiserFilter);
-      campaigns = campaigns.filter(c => {
-        const url = normalizeUrlForMatch(c.campaign_url);
-        const slug = normalizeUrlForMatch(c.campaign_slug);
-        // NOTE: campaign_slug is NOT reliably unique across campaigns (many
-        // share an auto-generated default slug), so it's only safe to use
-        // for an exact match, never as a "target ends with this slug"
-        // suffix check — that would match every campaign sharing the slug.
-        return (url && url === target) || (slug && slug === target) ||
-               (url && url.endsWith('/' + target)) || // in case target is just a slug
-               (target.endsWith('/' + url) && url);   // in case target has extra path
-      });
-    }
-
-    PANEL_DATA.campaigns.items = campaigns.map(c => ({
-      primary: c.campaign_name || c.v || 'Campaign',
-      secondary: c.user_name ? ('by ' + c.user_name) : '',
-      amount: c.amount_raised || 0,
-      avatarSrc: c.user_avatar_url || null
-    })).slice(0, CONFIG.maxItems);
-  }
-
-  function renderDonors(data) {
-    PANEL_DATA.donors.items = (data.top_donors || []).map(d => ({
-      primary: d.name,
-      secondary: '',
-      amount: d.amount ? d.amount.value : 0,
-      avatarSrc: d.avatar ? d.avatar.src : null
-    })).slice(0, CONFIG.maxItems);
-  }
-
-  function renderTeams(data) {
-    let teams = data.team_leaderboard || [];
-
-    if (CONFIG.teamFilter) {
-      const target = normalizeUrlForMatch(CONFIG.teamFilter);
-      teams = teams.filter(t => {
-        const url = normalizeUrlForMatch(t.url);
-        return (url && url === target) ||
-               (url && url.endsWith('/' + target)) || // in case target is just a slug
-               (target.endsWith('/' + url) && url);   // in case target has extra path
-      });
-    }
-
-    PANEL_DATA.teams.items = teams.map(t => ({
-      primary: t.name,
-      secondary: '',
-      amount: t.amount ? t.amount.value : 0,
-      avatarSrc: t.avatar ? t.avatar.src : null
-    })).slice(0, CONFIG.maxItems);
-  }
-
-  const RENDERERS = {
-    total: renderTotal,
-    fundraisers: renderFundraisers,
-    campaigns: renderCampaigns,
-    donors: renderDonors,
-    teams: renderTeams
+async function loadTiltify() {
+  const root = await resolveBase();
+  const need = (key, request) => PANELS.includes(key) || key === 'milestones' ? request() : Promise.resolve([]);
+  const [campaign, milestones, donations, targets, polls] = await Promise.allSettled([
+    getJson(PROXY + root),
+    need('milestones', () => getAll(`${root}/milestones`)),
+    need('donations', async () => (await getJson(`${PROXY}${root}/donations?limit=20`)).data || []),
+    need('targets', () => getAll(`${root}/targets`)),
+    need('polls', () => getAll(`${root}/polls`)),
+  ]);
+  if (campaign.status === 'rejected') throw campaign.reason;
+  const c = campaign.value.data;
+  const total = c.total_amount_raised || c.amount_raised;
+  // If one list fails, keep what we had for it
+  const pick = (result, key, map) => {
+    if (result.status === 'fulfilled') return (previous[key] = map(result.value));
+    console.warn(`Could not load ${key}: ${result.reason.message}`);
+    return previous[key] || [];
   };
-
-  const PANEL_IDS = {
-    total: 'panel-total',
-    fundraisers: 'panel-fundraisers',
-    campaigns: 'panel-campaigns',
-    donors: 'panel-donors',
-    teams: 'panel-teams'
+  const mine = pick(milestones, 'milestones', rows => rows.filter(m => m.active !== false)
+    .map(m => ({ name: m.name, amount: value(m.amount) })).sort((a, b) => a.amount - b.amount));
+  return {
+    label: 'Total raised', kind: root.includes('team_') ? 'Team campaign' : 'Campaign', name: c.name,
+    currency: (total && total.currency) || 'USD', raised: value(total), goal: value(c.goal),
+    milestones: URL_MILESTONES.length ? URL_MILESTONES : mine,
+    donations: pick(donations, 'donations', rows => rows
+      .sort((a, b) => String(b.completed_at).localeCompare(String(a.completed_at)))
+      .map(d => ({ name: d.donor_name || 'Anonymous', amount: value(d.amount) }))),
+    targets: pick(targets, 'targets', rows => rows.filter(open)
+      .map(t => ({ name: t.name, amount: value(t.amount), raised: value(t.amount_raised) }))),
+    polls: pick(polls, 'polls', rows => rows.filter(open)
+      .map(p => ({ name: p.name, options: (p.options || []).map(o => ({ name: o.name, raised: value(o.amount_raised) })) }))),
   };
+}
 
-  // ----------------------------------------------------------------------
-  // ROTATION
-  // ----------------------------------------------------------------------
-  let activePanels = CONFIG.panelOrder.filter(p => PANEL_IDS[p]);
-  if (activePanels.length === 0) activePanels = ['total', 'fundraisers', 'campaigns', 'donors'];
-
-  let currentPanelIndex = 0;
-  let currentEntryIndex = 0;
-  let stepTimer = null;
-
-  function showPanel(panelKey) {
-    Object.values(PANEL_IDS).forEach(id => {
-      document.getElementById(id).classList.remove('active');
-    });
-    const el = document.getElementById(PANEL_IDS[panelKey]);
-    if (el) el.classList.add('active');
+let latest = null;
+async function refresh() {
+  try {
+    latest = await (DIRECT ? loadTiltify() : loadEvent());
+    apply({ status: 'ok', data: latest });
+  } catch (e) {
+    console.error('Ticker:', e.message);
+    if (latest) $('badge').textContent = 'RECONNECTING';
+    else apply({ status: 'error', message: e.message });
   }
+  setTimeout(refresh, REFRESH * 1000);
+}
 
-  // Draws the current entry for a list-type panel (fundraisers/campaigns/donors).
-  function drawCurrentEntry(panelKey) {
-    const pdata = PANEL_DATA[panelKey];
-    if (!pdata) return;
-    const container = document.getElementById(pdata.containerId);
-    if (!container) return;
-    renderSingleEntry(container, pdata.items, currentEntryIndex, { showAvatar: pdata.showAvatar });
-  }
-
-  // Advances the ticker by one "step" — either the next entry within the
-  // current list panel, or the next panel entirely.
-  function advanceStep() {
-    const panelKey = activePanels[currentPanelIndex];
-    const pdata = PANEL_DATA[panelKey];
-    const isListPanel = !!pdata;
-
-    if (isListPanel && pdata.items.length > 1 && currentEntryIndex < pdata.items.length - 1) {
-      // More entries left in this panel — show the next one.
-      currentEntryIndex++;
-      drawCurrentEntry(panelKey);
-      scheduleNextStep(CONFIG.entrySeconds);
-      return;
-    }
-
-    // Nothing to advance to: only one panel is active, and it has at most
-    // one entry (or it's a non-list panel) — just stay put, no more timers.
-    if (activePanels.length <= 1) {
-      return;
-    }
-
-    // Otherwise move on to the next panel.
-    currentPanelIndex = (currentPanelIndex + 1) % activePanels.length;
-    currentEntryIndex = 0;
-    enterPanel(currentPanelIndex);
-  }
-
-  function enterPanel(index) {
-    const panelKey = activePanels[index];
-    showPanel(panelKey);
-
-    const pdata = PANEL_DATA[panelKey];
-    if (pdata) {
-      currentEntryIndex = 0;
-      drawCurrentEntry(panelKey);
-      // If a list panel has no items at all, don't get stuck — move on
-      // after the normal dwell time anyway.
-      scheduleNextStep(CONFIG.entrySeconds);
-    } else {
-      // Simple panel (total raised) — dwell for the full panel duration.
-      scheduleNextStep(CONFIG.rotateSeconds);
-    }
-  }
-
-  function scheduleNextStep(seconds) {
-    if (stepTimer) clearTimeout(stepTimer);
-    stepTimer = setTimeout(advanceStep, Math.max(1, seconds) * 1000);
-  }
-
-  function startRotation() {
-    currentPanelIndex = 0;
-    currentEntryIndex = 0;
-    enterPanel(currentPanelIndex);
-  }
-
-  // Re-renders whatever is currently on screen after a fresh data fetch,
-  // without resetting position/timers (keeps the ticker feeling continuous).
-  function refreshCurrentView() {
-    const panelKey = activePanels[currentPanelIndex];
-    const pdata = PANEL_DATA[panelKey];
-    if (pdata) {
-      // Clamp entry index in case the new data has fewer items.
-      if (currentEntryIndex >= pdata.items.length) currentEntryIndex = 0;
-      drawCurrentEntry(panelKey);
-    }
-  }
-
-  // ----------------------------------------------------------------------
-  // DATA FETCHING
-  // ----------------------------------------------------------------------
-  let hasLoadedOnce = false;
-
-  async function fetchData() {
-    try {
-      const res = await fetch(CONFIG.apiUrl, { cache: 'no-store' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const raw = await res.json();
-      // The live API nests all the actual fields under "tiltify".
-      // Fall back to the raw payload itself in case the shape ever
-      // changes back to a flat structure.
-      const data = (raw && raw.tiltify) ? raw.tiltify : raw;
-
-      activePanels.forEach(key => {
-        if (RENDERERS[key]) RENDERERS[key](data);
-      });
-
-      const statusEl = document.getElementById('status-msg');
-      if (statusEl) statusEl.remove();
-
-      if (!hasLoadedOnce) {
-        hasLoadedOnce = true;
-        startRotation();
-      } else {
-        refreshCurrentView();
-      }
-    } catch (err) {
-      console.error('Charity ticker fetch failed:', err);
-      if (!hasLoadedOnce) {
-        const statusEl = document.getElementById('status-msg');
-        if (statusEl) {
-          statusEl.textContent = 'Unable to load data (' + err.message + '). Check console / CORS.';
-          statusEl.classList.add('error');
-        }
-      }
-      // If it already loaded once successfully, just keep showing stale data
-      // and silently retry on the next refresh cycle.
-    }
-  }
-
-  fetchData();
-  setInterval(fetchData, Math.max(5, CONFIG.refreshSeconds) * 1000);
-
-})();
+// Wait briefly for the web fonts so widths are measured correctly
+Promise.race([
+  Promise.allSettled([document.fonts.load('24px "FSSinclair"'), document.fonts.load('600 24px "Barlow Condensed"')]),
+  new Promise(r => setTimeout(r, 1500)),
+]).then(() => {
+  if (DEMO) apply(sample); else refresh();
+  requestAnimationFrame(frame);
+});
 </script>
-
 </body>
 </html>
