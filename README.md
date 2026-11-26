@@ -45,3 +45,22 @@ The older `w`, `h`, `rotate`, `entry` and `title_*` options no longer do anythin
 
 With live Tiltify data, a campaign that belongs to a fundraising event also shows the event's total
 and goal, plus its top fundraisers, teams and donors. The Worker must run the current `worker.js`.
+
+## Donation alerts
+
+With live Tiltify data, each new donation slides a "New donation by" banner over the feed.
+Donations already made when the ticker loads do not alert. Allow up to about 20 seconds.
+Use the current `worker.js` in your Worker.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `audio=1` | off | Play a chime with each alert |
+| `sound=alert.mp3` | built-in chime | Your own sound file (upload it beside `index.html`); turns audio on |
+| `volume` | 60 | 0 to 100 |
+| `alerttime` | 7 | Seconds each alert stays up |
+| `alertcolor` | `5b7cf5` | Banner color, hex without `#` |
+| `alerts=off` | on | Turn alerts off |
+| `testalert` | | Repeat a test alert for setup. Remove before going live |
+
+In OBS, tick **Control audio via OBS** on the browser source to get a mixer slider for the sound.
+
