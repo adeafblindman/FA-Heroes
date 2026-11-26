@@ -2,13 +2,7 @@
 
 One scrolling line: raised total pinned on the left; next milestone, goal progress and lists rotate past.
 
-## Put it online
-
-1. Upload `index.html` to this repo, replacing the old one. Keep `FSSinclair-Medium.otf` beside it.
-2. Repo **Settings > Pages**: Source "Deploy from a branch", branch `main`, folder `/ (root)`.
-3. In OBS add a **Browser** source with your address, width **1920**, height **56**.
-
-Address: `https://adeafblindman.github.io/Heros2026/`
+Address: `https://adeafblindman.github.io/FA-Heroes/`
 
 ## Pick what it shows (event feed, no keys needed)
 
