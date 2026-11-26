@@ -152,10 +152,10 @@ function buildItems(s) {
       for (const o of p.options) parts.push([o.name, 'sub'], [$$(o.raised), 'val']);
       return item('Poll', 'info', parts);
     }),
-    fundraisers: () => ranked('Top fundraiser', d.fundraisers, $$),
+    fundraisers: () => ranked(`${d.scope || ''}Top fundraiser`, d.fundraisers, $$),
     campaigns: () => ranked('Campaign', d.campaigns, $$),
-    donors: () => ranked('Top donor', d.donors, $$),
-    teams: () => ranked('Team', d.teams, $$),
+    donors: () => ranked(`${d.scope || ''}Top donor`, d.donors, $$),
+    teams: () => ranked(`${d.scope || ''}Team`, d.teams, $$),
   };
   const out = PANELS.flatMap(key => Object.hasOwn(sections, key) ? sections[key]() : []);
   return out.length ? out : [item('Status', 'info', [['Nothing to show yet']])];
@@ -171,8 +171,13 @@ function progress(d, $$) {
   if (d.goal) out.push(d.raised >= d.goal
     ? item('Goal reached', 'good', [[$$(d.goal), 'val'], ['Thank you!']])
     : item('Goal', '', [pct(d.raised / d.goal * 100), [`${$$(d.goal - d.raised)} to go`, 'sub']]));
-  if (d.event) out.push(item('Event total', 'info', [[$$(d.event.total), 'val'],
-    ...(d.event.pct == null ? [] : [pct(d.event.pct), ['of goal', 'sub']])]));
+  if (d.event) {
+    const e = d.event;
+    out.push(item('Event total', 'info', [
+      ...(e.name ? [[e.name, 'name']] : []), [$$(e.total), 'val'],
+      ...(e.goal ? [[`/ ${$$(e.goal)}`, 'sub']] : []),
+      ...(e.pct == null ? [] : [pct(e.pct), ['of goal', 'sub']])]));
+  }
   return out;
 }
 
@@ -206,7 +211,7 @@ function countTo(target, currency) {
 }
 
 function renderFixed(s) {
-  $('badge').textContent = DEMO ? 'DEMO DATA' : s.status === 'stale' ? 'RECONNECTING' : '';
+  $('badge').textContent = DEMO ? 'DEMO DATA' : s.status === 'stale' ? 'RECONNECTING' : (s.data && s.data.notice) || '';
   const d = s.data;
   if (!d) return;
   $('label').textContent = d.label || 'Total raised';
@@ -356,6 +361,46 @@ async function getAll(route) {
 
 const open = x => x.active !== false && (!x.ends_at || Date.parse(x.ends_at) > Date.now());
 
+// The fundraising event a campaign belongs to, with its leaderboards
+async function loadLinkedEvent(c) {
+  const fact = (c.parent_facts || []).find(f => String(f.usage_type).startsWith('fundraising_event'));
+  const id = c.fundraising_event_id || (fact && fact.id);
+  if (!id) return {};
+  const route = `${PROXY}/api/public/fundraising_events/${encodeURIComponent(id)}`;
+  let info;
+  try {
+    info = (await getJson(route)).data;
+  } catch (e) {
+    console.warn(`Could not load the linked event: ${e.message}`);
+    // "Not found" is the proxy's own answer: it is an older worker.js
+    if (e.message === 'Not found') return { notice: 'UPDATE WORKER.JS FOR EVENT DATA' };
+    return previous.linked || {};
+  }
+  const board = async (panel, name) => {
+    if (!PANELS.includes(panel)) return [];
+    try {
+      const body = await getJson(`${route}/${name}?time_type=all&limit=${MAXITEMS}`);
+      return (previous[name] = (body.data || [])
+        .map(x => ({ name: x.name, amount: value(x.amount), avatar: x.avatar && x.avatar.src }))
+        .sort((a, b) => b.amount - a.amount)
+        .map((x, i) => ({ ...x, rank: i + 1 })));
+    } catch (e) {
+      console.warn(`Could not load ${name}: ${e.message}`);
+      return previous[name] || [];
+    }
+  };
+  const [fundraisers, teams, donors] = await Promise.all([
+    board('fundraisers', 'user_leaderboard'),
+    board('teams', 'team_leaderboard'),
+    board('donors', 'donor_leaderboard'),
+  ]);
+  const total = value(info.total_amount_raised), goal = value(info.goal);
+  return (previous.linked = {
+    event: { name: info.name, total, goal, pct: goal ? total / goal * 100 : null },
+    scope: 'Event ', fundraisers, teams, donors,
+  });
+}
+
 async function loadTiltify() {
   const root = await resolveBase();
   const need = (key, request) => PANELS.includes(key) || key === 'milestones' ? request() : Promise.resolve([]);
@@ -377,7 +422,9 @@ async function loadTiltify() {
   };
   const mine = pick(milestones, 'milestones', rows => rows.filter(m => m.active !== false)
     .map(m => ({ name: m.name, amount: value(m.amount) })).sort((a, b) => a.amount - b.amount));
+  const linked = await loadLinkedEvent(c);
   return {
+    ...linked,
     label: 'Total raised', kind: root.includes('team_') ? 'Team campaign' : 'Campaign', name: c.name,
     currency: (total && total.currency) || 'USD', raised: value(total), goal: value(c.goal),
     milestones: URL_MILESTONES.length ? URL_MILESTONES : mine,

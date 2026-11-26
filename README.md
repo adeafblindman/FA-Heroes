@@ -17,27 +17,7 @@ Data comes from `hd2clans.com/api/public/heroes26`.
 
 Only campaigns and teams that appear in the feed can be selected.
 
-## Live Tiltify data (milestones, donations, targets, polls)
 
-Tiltify needs a client secret, and everything on GitHub Pages is public, so a small free
-Cloudflare Worker holds the secret.
-
-1. At https://app.tiltify.com/developers create an application. Note the Client ID and Client Secret.
-2. At https://dash.cloudflare.com create a Worker, choose **Edit code**, paste in `worker.js`, and deploy.
-3. In the Worker's **Settings > Variables and Secrets** add two secrets:
-   `TILTIFY_CLIENT_ID` and `TILTIFY_CLIENT_SECRET`.
-4. Add your Worker address to the ticker address:
-
-```
-?proxy=https://NAME.YOURNAME.workers.dev&campaign=@user/campaign-slug
-?proxy=https://NAME.YOURNAME.workers.dev&team=+team-slug/team-campaign-slug
-```
-
-To leave `proxy=` off, paste the Worker address into `DEFAULT_PROXY` near the top of the script in
-`index.html`. With that set, **all** data comes from Tiltify, so `campaign=` or `team=` is required.
-In this mode `team=` means a **team campaign** (`+team/campaign`), not just the team.
-
-If your pages are served from a different domain, set an `ALLOWED_ORIGIN` variable on the Worker.
 
 ## All address options
 
@@ -60,3 +40,8 @@ Join with `&`. Use `%20` for spaces.
 | `position` | bottom | `top`, `center`, `bottom` if the source is taller than 56 |
 
 The older `w`, `h`, `rotate`, `entry` and `title_*` options no longer do anything.
+
+## Linked events
+
+With live Tiltify data, a campaign that belongs to a fundraising event also shows the event's total
+and goal, plus its top fundraisers, teams and donors. The Worker must run the current `worker.js`.
